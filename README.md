@@ -14,13 +14,9 @@ The project includes:
 - video annotation for the estimated track
 - example output generation for single-vehicle tracking
 
-### Kalman Filter
-
-![Kalman filter tracking animation](assets/kalman_single_veh_track.gif)
-
-### Alpha-Beta Filter
-
-![Alpha-Beta filter tracking animation](assets/alpha_beta_single_veh_track.gif)
+| Kalman Filter                                                           | Alpha-Beta Filter                                                               |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| ![Kalman filter tracking animation](assets/kalman_single_veh_track.gif) | ![Alpha-Beta filter tracking animation](assets/alpha_beta_single_veh_track.gif) |
 
 ## Included components
 
