@@ -16,11 +16,11 @@ The project includes:
 
 ### Kalman Filter
 
-![Kalman filter tracking animation](results/kalman_single_veh_track.gif)
+![Kalman filter tracking animation](assets/kalman_single_veh_track.gif)
 
 ### Alpha-Beta Filter
 
-![Alpha-Beta filter tracking animation](results/alpha_beta_single_veh_track.gif)
+![Alpha-Beta filter tracking animation](assets/alpha_beta_single_veh_track.gif)
 
 ## Included components
 
