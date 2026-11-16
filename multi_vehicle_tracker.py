@@ -237,7 +237,7 @@ def main():
     )
     parser.add_argument(
         "--output_tracks",
-        default="data/multi_vehicle_tracks.json",
+        default="results/multi_vehicle_tracks.json",
         help="Path for the JSON output with assigned track IDs",
     )
     parser.add_argument(
