@@ -10,6 +10,7 @@ import logging
 import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 
 
 def load_obj_each_frame(data_file):
@@ -263,49 +264,85 @@ def draw_object(object_dict,image,color = (0, 255, 0), thickness = 2,c_color= (2
     return image
 
 
-def draw_objects_in_video(video_file,frame_dict,car_frame_data):
-    """Write a video with detected objects and known cars annotated per frame.
+def draw_objects_in_video(video_file, frame_dict, frame_track_data, output_video):
+    """Write a video with detection boxes and tracked vehicle markers.
 
-    Each source frame is resized to 700 by 500 pixels. Detection boxes and
-    labels are drawn from ``frame_dict``; known-car identifiers and circular
-    markers are drawn from ``car_frame_data``. The output filename is fixed to
-    ``part_2_demo.mp4`` and the video is encoded at 30 frames per second.
-    The function creates or overwrites this file in the current working
-    directory; OpenCV drawing operations modify each frame before writing.
+    Source frames are resized to 700 by 500 pixels. Detection bounding boxes
+    and IDs are drawn from ``frame_dict``; filtered or predicted track centers
+    and IDs are drawn from the matching entry in ``frame_track_data``.
 
     Args:
         video_file (str or os.PathLike): Path to the source video.
-        frame_dict (mapping): Mapping from stringified zero-based frame
-            numbers to sequences of object records accepted by
-            :func:`draw_object`.
-        car_frame_data (sequence of sequence): Per-frame car records accepted
-            by :func:`draw_car`, indexed by zero-based frame number.
+        frame_dict (mapping): Frame-indexed detection records. Keys are
+            stringified zero-based frame numbers and values are sequences of
+            objects accepted by :func:`draw_object`.
+        frame_track_data (sequence of sequence): Per-frame track snapshots.
+            Each track entry is ``[track_id, x, y]`` and is accepted by
+            :func:`draw_car`.
+        output_video (str or os.PathLike): Path for the annotated video. Its
+            parent directory is created if needed.
 
     Returns:
         None.
 
-    Note:
-        Both data sources must have entries for every frame read from the
-        video.
+    Raises:
+        OSError: If the input video cannot be opened or the output video
+            writer cannot be created.
+
+    Side effects:
+        Creates or overwrites ``output_video`` using the ``mp4v`` codec at
+        30 frames per second. Frames are modified by OpenCV drawing operations
+        before they are written.
     """
+    capture = cv.VideoCapture(str(video_file))
+    if not capture.isOpened():
+        raise OSError(f"Could not open input video: {video_file}")
 
-    count = 0
-    cap = cv.VideoCapture(video_file)
-    frames = []
-    ok, image = cap.read()
-    vidwrite = cv.VideoWriter("part_2_demo.mp4", cv.VideoWriter.fourcc(*'mp4v'), 30, (700,500))
-    while ok:
-        image = cv.resize(image, (700, 500))
-        obj_list = frame_dict[str(count)]
-        for obj in obj_list:
-          image = draw_object(obj,image)
+    output_path = Path(output_video)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    writer = cv.VideoWriter(
+        str(output_path),
+        cv.VideoWriter.fourcc(*"mp4v"),
+        30,
+        (700, 500),
+    )
+    if not writer.isOpened():
+        capture.release()
+        raise OSError(f"Could not open output video: {output_video}")
 
-        # Draw known cars
-        for car_frame in car_frame_data[count]:
-            image = draw_car(car_frame,image)
+    frame_index = 0
+    try:
+        ok, image = capture.read()
+        while ok:
+            image = cv.resize(image, (700, 500))
+            for detection in frame_dict.get(str(frame_index), []):
+                image = draw_object(detection, image)
+            if frame_index < len(frame_track_data):
+                for car in frame_track_data[frame_index]:
+                    image = draw_car(car, image)
+            writer.write(image)
+            frame_index += 1
+            ok, image = capture.read()
+    finally:
+        capture.release()
+        writer.release()
 
-        vidwrite.write(image)
-        count+=1
-        ok, image = cap.read()
-    vidwrite.release()
 
+def object_center(detection):
+    """Calculate the center of an object's bounding box.
+
+    Args:
+        detection (mapping): Object record containing ``x_min``, ``y_min``,
+            ``width``, and ``height`` values.
+
+    Returns:
+        numpy.ndarray: Center coordinates in ``[x, y]`` order, shaped as a
+        column array with shape ``(2, 1)``.
+
+    Raises:
+        KeyError: If a required bounding-box field is missing.
+        TypeError: If a bounding-box value cannot be used in arithmetic.
+    """
+    x = detection["x_min"] + detection["width"] / 2
+    y = detection["y_min"] + detection["height"] / 2
+    return np.array([[x], [y]], dtype=float)

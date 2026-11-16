@@ -1,46 +1,61 @@
-# Single Vehicle Tracking
+# Vehicle State Estimation and Tracking
 
-A lightweight Python project for single-object tracking using an Alpha-Beta filter and a Kalman filter.
+A Python project for estimating vehicle motion and assigning persistent identities to objects detected in video. It includes single-object tracking with Alpha-Beta and Kalman filters, plus multi-object tracking with Kalman prediction and Hungarian data association.
 
-This repository focuses on estimating a tracked object's center over time from noisy measurements and visualizing the filtered trajectory on video.
+## Project Highlights
 
-## Overview
+- **Single-object tracking:** compare Alpha-Beta and Kalman-filter position estimates from per-frame measurements.
+- **Multi-object tracking:** associate bounding-box detections across frames and maintain IDs for vehicles.
+- **Visualization:** render filtered tracks and labeled detections over source video.
+- **Data workflow:** read detections from JSON and save tracked results as JSON and video.
 
-The project includes:
-
-- a simple Alpha-Beta tracker
-- a 2D Kalman filter implementation
-- JSON loading for measurement data
-- video annotation for the estimated track
-- example output generation for single-vehicle tracking
+### Single-object tracking
 
 | Kalman Filter                                                           | Alpha-Beta Filter                                                               |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | ![Kalman filter tracking animation](assets/kalman_single_veh_track.gif) | ![Alpha-Beta filter tracking animation](assets/alpha_beta_single_veh_track.gif) |
 
-## Included components
+### Multi-object tracking
 
-- `single_vehicle_track.py` — main tracking script
-- `kalman.py` — Kalman filter implementation
-- `utils.py` — file loading and video rendering helpers
-- `data/` — input tracking and video data
-- `results/` — generated output files
+The multi-object example below shows detection boxes and assigned vehicle IDs over time.
 
-## Usage
+![Multi-object tracking animation](assets/multi_vehicle_tracking.gif)
 
-Run the tracker with either filter:
+## Tracking Methods
+
+### Single vehicle
+
+`single_vehicle_track.py` accepts measurements in `[x, y]` form and supports two filters:
+
+- **Alpha-Beta:** constant-velocity prediction with fixed position and velocity correction gains.
+- **Kalman:** uses a four-value state `[x, vx, y, vy]` and position observations `[x, y]`.
+
+A missing measurement can be represented as `[-1, -1]` in the input data.
+
+### Multiple vehicles
+
+`multi_vehicle_tracker.py` reads per-frame bounding-box detections, initializes a track for each object in the first frame, predicts existing tracks with a Kalman filter, then uses global Hungarian assignment over center-to-center distances. Matches must be closer than the configured threshold; unmatched detections start new tracks and unmatched tracks continue from their predictions.
+
+The threshold is a pixel distance in the coordinates of the resized 700 by 500 video frames. It may need adjustment for different videos or detector output.
+
+## Setup
+
+Use Python 3 and install the dependencies:
 
 ```bash
-python single_vehicle_track.py --filter-type kalman
+python -m pip install -r requirements.txt
 ```
 
-or
+## Run Single-Object Tracking
+
+Run either filter with the included defaults:
 
 ```bash
 python single_vehicle_track.py --filter-type alpha_beta
+python single_vehicle_track.py --filter-type kalman
 ```
 
-Optional arguments:
+The script defaults to `data/object_to_track.json` and `data/commonwealth.mp4`. Choose alternate inputs or a video output path with:
 
 ```bash
 python single_vehicle_track.py \
@@ -50,34 +65,48 @@ python single_vehicle_track.py \
   --output_video results/single_vehicle_track.mp4
 ```
 
-## Data
+The input JSON contains an `obj` key whose value is a sequence of `[x, y]` measurements. The script writes the estimated positions to `data/single_vehicle_track.json`. If `--output_video` is omitted, it writes `results/<filter>_single_veh_track.mp4`.
 
-The project expects tracking JSON and video inputs in the `data/` directory.
+## Run Multi-Object Tracking
 
-Example placeholder paths:
+Run the multi-object tracker using its default paths:
 
-- `data/object_to_track.json`
-- `data/commonwealth.mp4`
+```bash
+python multi_vehicle_tracker.py
+```
 
-## Example outputs
+The defaults are:
 
-Generated outputs are written to the `results/` directory, for example:
+- Input detections: `data/frame_dict.json`
+- Source video: `data/commonwealth.mp4`
+- Tracked detections: `data/multi_vehicle_tracks.json`
+- Annotated video: `results/multi_vehicle_tracking.mp4`
+- Association threshold: 35 pixels
 
-- `results/kalman_track.mp4`
-- `results/alpha_beta_track.mp4`
-- `results/single_vehicle_track.mp4`
+Override any of these values from the command line:
 
-## Placeholder media
+```bash
+python multi_vehicle_tracker.py \
+  --tracks_path data/frame_dict.json \
+  --video_path data/commonwealth.mp4 \
+  --output_tracks data/multi_vehicle_tracks.json \
+  --output_video results/multi_vehicle_tracking.mp4 \
+  --threshold 35
+```
 
-Add your actual example videos here:
+The input JSON is a mapping from consecutive stringified frame indices (`"0"`, `"1"`, ...) to lists of detections. Each detection must contain `x_min`, `y_min`, `width`, and `height`. The tracker adds an `id` field to each detection in the saved JSON.
 
-- `data/commonwealth.mp4`
-- `results/demo_video.mp4`
+## Project Files
+
+- `single_vehicle_track.py` — single-object Alpha-Beta and Kalman tracking command-line program.
+- `multi_vehicle_tracker.py` — multi-object Kalman tracking and Hungarian assignment command-line program.
+- `kalman.py` — shared linear Kalman filter implementation.
+- `utils.py` — JSON loading and drawing helpers for tracks, detections, and videos.
+- `data/` — sample detection JSON, measurement JSON, and source video.
+- `assets/` — animated GIF previews embedded in this README.
+- `results/` — generated annotated videos and other example outputs.
+- `part2_final.py`, `pa3_demo.py`, `Part2_final.ipynb`, and `multi_vehicle_tracker_old.py` — earlier assignment/demo implementations and experiments; the commands above use the current tracker scripts.
 
 ## Requirements
 
-See `requirements.txt` for the project dependencies.
-
-## Notes
-
-This project is intentionally scoped to the single-vehicle tracking problem. It demonstrates the difference between a simple motion model filter and a state-estimation Kalman filter approach.
+Dependencies are listed in `requirements.txt`: NumPy, OpenCV, SciPy, Matplotlib, and ContourPy. SciPy provides the Hungarian assignment routine used by multi-object tracking.
